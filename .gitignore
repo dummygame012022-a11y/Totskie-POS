@@ -1,0 +1,7 @@
+*.db
+secret.key
+telegram.json
+assetlinks.json
+backup*/
+*.bak*
+__pycache__/

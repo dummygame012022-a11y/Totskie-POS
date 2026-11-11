@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">Totskie Tech Solution - POS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1f2937">
+</head>
+<body>
+
+  <!-- SIDEBAR MENU DRAWER -->
+  <div class="sidebar-drawer" id="sidebarDrawer">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <span style="font-size: 11px; font-weight: 800; color: #22c55e;">NAVIGATION</span>
+      <button onclick="toggleSidebar()" style="background: none; border: none; color: #fff; cursor: pointer; font-size: 12px;">✕</button>
+    </div>
+    <div class="sidebar-item" onclick="toggleSidebar()">🛒 Sales Register</div>
+    <div class="sidebar-item" onclick="openZReportModal(); toggleSidebar();">💵 Shift Z-Report / Cash Drawer</div>
+    <div class="sidebar-item" onclick="openKdsModal(); toggleSidebar();">🍳 Kitchen Display (KDS)</div>
+    <div class="sidebar-item" onclick="openItemManagerModal(); toggleSidebar();">📦 Items & Inventory Management</div>
+    <div class="sidebar-item" onclick="openHeldOrdersModal(); toggleSidebar();">📌 Held Orders (<span id="heldCount">0</span>)</div>
+    <div class="sidebar-item" onclick="openSalesHistoryModal(); toggleSidebar();">📜 Receipts & Sales History</div>
+    <div class="sidebar-item" onclick="openSettingsModal(); toggleSidebar();">⚙️ Store Settings & Tax</div>
+    <div class="sidebar-item" onclick="tskGuide(); toggleSidebar();">&#128161; Guide / Gabay</div>
+    <div class="sidebar-item" onclick="openStaffModal(); toggleSidebar();">&#128101; Staff PINs</div>
+    <div class="sidebar-item" onclick="openDataModal(); toggleSidebar();">&#128190; Data: Export / Reset</div>
+    <div class="sidebar-item" onclick="logoutNow(); toggleSidebar();">&#128274; Log out</div>
+  </div>
+
+  <div class="pos-header">
+    <div class="brand-container" style="text-align:center; flex-grow:1; margin:0 auto;">
+      <button class="menu-toggle-btn" onclick="toggleSidebar()">☰</button>
+      <svg class="tsk-mark" width="40" height="40" viewBox="0 0 100 100" style="flex:0 0 auto;display:block" role="img" aria-label="TOTSKIE"><rect width="100" height="100" rx="22" fill="#0b1f15"/><rect x="1.5" y="1.5" width="97" height="97" rx="21" fill="none" stroke="#22c55e" stroke-width="3"/><rect x="24" y="18" width="52" height="11" rx="2.5" fill="#4ade80"/><rect x="44.5" y="18" width="11" height="36" rx="2.5" fill="#4ade80"/><path d="M28 64 L40 73 L28 82" fill="none" stroke="#4ade80" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M47 82 H66" stroke="#4ade80" stroke-width="5" stroke-linecap="round"/></svg><span class="tsk-word">TOTSKIE<small>TECH SOLUTIONS</small></span>
+      <div class="brand-text-group" style="text-align:center; flex-grow:1; margin:0 auto;">
+        <div class="brand-name" style="text-align:center; flex-grow:1; margin:0 auto;" id="headerStoreName">TOTSKIE</div>
+        <div class="brand-sub" style="text-align:center; flex-grow:1; margin:0 auto;"><span style="font-weight: bold; font-size: 1.15rem;">POS SYSTEM</span></div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="nav-btn hold" onclick="holdCurrentOrder()">💾 Save Ticket</button>
+      <button class="nav-btn" onclick="clearCart()">Clear Cart</button>
+    </div>
+  </div>
+
+  <div class="pos-workspace">
+    <div class="product-section">
+      <div class="category-tabs" id="categoryTabs"></div>
+
+      <div class="search-row">
+        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+      <input type="text" id="searchBox" class="search-box" placeholder="🔍 Scan Barcode or Search item..." onkeyup="filterProducts()" onkeydown="handleBarcodeScan(event)" style="flex: 1;">
+      
+    </div>
+        <button class="custom-item-btn" onclick="openCustomModal()">+ Custom Item</button>
+      </div>
+
+      <div class="product-grid" id="productGrid"></div>
+    </div>
+
+    <div class="cart-section">
+      <div class="order-type-bar">
+        <button class="order-type-btn active" onclick="setOrderType(this)">Dine-In</button>
+        <button class="order-type-btn" onclick="setOrderType(this)">Take-Out</button>
+        <button class="order-type-btn" onclick="setOrderType(this)">Delivery</button>
+      </div>
+
+      <div class="customer-bar" onclick="openCustomerModal()">
+        <span id="customerNameDisplay">👤 Walk-in Customer</span>
+        <span style="font-size: 9px; color: #94a3b8;">Change ▼</span>
+      </div>
+
+      <div class="cart-header">
+        <span>Current Order</span>
+        <span id="cartCount">0 items</span>
+      </div>
+
+      <div class="cart-items" id="cartItems">
+        <div class="cart-empty">No items added yet</div>
+      </div>
+
+      <div class="cart-actions">
+        <button class="action-chip-btn" onclick="applyDiscount()">% Discount</button>
+        <button class="action-chip-btn" onclick="openNoteModal()">📝 Add Note</button>
+      </div>
+
+      <div class="cart-footer">
+        <div class="summary-row">
+          <span>Subtotal</span>
+          <span id="subtotalText">₱0.00</span>
+        </div>
+        <div class="summary-row" id="discountRow" style="display: none; color: #22c55e;">
+          <span>Discount (10%)</span>
+          <span id="discountText">-₱0.00</span>
+        </div>
+        <div class="summary-row" id="taxRow" style="display: none; color: #38bdf8;">
+          <span id="taxLabel">VAT (12%)</span>
+          <span id="taxText">₱0.00</span>
+        </div>
+        <div class="summary-row total">
+          <span>Total</span>
+          <span id="totalText">₱0.00</span>
+        </div>
+        <button class="pay-btn" onclick="openPaymentModal()">Charge / Pay</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div class="modal-overlay" id="renameCatModal" style="z-index: 10000;">
+    <div class="modal-content">
+      <div style="font-size: 12px; font-weight: bold; color: #22c55e;">Rename Category</div>
+      <input type="text" id="renameCatInput" class="custom-input" placeholder="Category name">
+      <div style="display: flex; gap: 6px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1; min-height: 44px;" onclick="closeRenameCat()">Cancel</button>
+        <button class="modal-btn" style="flex: 1; min-height: 44px;" onclick="saveRenameCat()">Save</button>
+      </div>
+    </div>
+  </div>
+  <div id="loginOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:20000; background:#0f172a; align-items:center; justify-content:center; padding:15px; box-sizing:border-box; overflow-y:auto;">
+    <div style="width:100%; max-width:320px; text-align:center; color:#f8fafc;">
+      <div style="display:flex; justify-content:center;"><svg class="tsk-mark" width="84" height="84" viewBox="0 0 100 100" style="flex:0 0 auto;display:block" role="img" aria-label="TOTSKIE"><rect width="100" height="100" rx="22" fill="#0b1f15"/><rect x="1.5" y="1.5" width="97" height="97" rx="21" fill="none" stroke="#22c55e" stroke-width="3"/><rect x="24" y="18" width="52" height="11" rx="2.5" fill="#4ade80"/><rect x="44.5" y="18" width="11" height="36" rx="2.5" fill="#4ade80"/><path d="M28 64 L40 73 L28 82" fill="none" stroke="#4ade80" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M47 82 H66" stroke="#4ade80" stroke-width="5" stroke-linecap="round"/></svg></div>
+      <div style="font-size:22px; font-weight:900; letter-spacing:2px; margin-top:8px;">TOTSKIE</div>
+      <div style="font-size:12px; color:#94a3b8; margin-bottom:14px;">tech solutions</div>
+      <div id="loginTitle" style="font-size:13px; font-weight:bold; color:#22c55e; margin-bottom:6px;">Enter PIN</div>
+      <div id="loginDots" style="font-size:26px; letter-spacing:6px; min-height:36px;"></div>
+      <div id="loginMsg" style="color:#fca5a5; font-size:12px; min-height:16px; margin-bottom:6px;"></div>
+      <div id="loginPad" style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"></div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="staffModal" style="z-index: 10000;">
+    <div class="modal-content">
+      <div style="font-size: 12px; font-weight: bold; color: #22c55e;">Staff PINs</div>
+      <div id="staffList" style="display:flex; flex-direction:column; gap:6px; max-height:140px; overflow-y:auto;"></div>
+      <input type="text" id="staffName" class="custom-input" placeholder="Name">
+      <select id="staffRole" class="custom-input"><option value="cashier">Cashier</option><option value="kitchen">Kitchen</option><option value="admin">Admin</option></select>
+      <input type="password" id="staffPin" class="custom-input" placeholder="PIN (4-6 digits)" inputmode="numeric" maxlength="6">
+      <div style="display: flex; gap: 8px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1; min-height: 44px;" onclick="closeStaffModal()">Close</button>
+        <button class="modal-btn" style="flex: 1; min-height: 44px;" onclick="addStaff()">Add</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="dataModal" style="z-index: 10000;">
+    <div class="modal-content">
+      <div style="font-size: 12px; font-weight: bold; color: #22c55e;">Export Sales</div>
+      <label style="font-size: 9px; color: #94a3b8;">From (optional):</label>
+      <input type="date" id="exportFrom" class="custom-input">
+      <label style="font-size: 9px; color: #94a3b8;">To (optional):</label>
+      <input type="date" id="exportTo" class="custom-input">
+      <button class="modal-btn" style="min-height: 44px;" onclick="exportSalesRange()">Download CSV</button>
+      <div style="border-top: 1px solid #334155; margin-top: 4px; padding-top: 8px; font-size: 12px; font-weight: bold; color: #fca5a5;">Reset to Defaults</div>
+      <div style="font-size: 10px; color: #94a3b8;">Deletes all products, sales and kitchen orders. Staff PINs are kept. Export your sales first.</div>
+      <input type="password" id="resetPinInput" class="custom-input" placeholder="Admin PIN to confirm" inputmode="numeric" maxlength="6">
+      <button class="modal-btn" style="background: #7f1d1d; color: #fca5a5; min-height: 44px;" onclick="resetToDefaults()">Reset to Defaults</button>
+      <button class="modal-btn" style="background: #334155; color: #fff; min-height: 44px;" onclick="closeDataModal()">Close</button>
+    </div>
+  </div>
+  <div class="modal-overlay" id="customAlertModal">
+    <div class="modal-content" style="width: 280px; text-align: center;">
+      <div class="receipt-header" style="color: #22c55e;">System Notification</div>
+      <div style="font-size: 11px; color: #f8fafc; padding: 6px 0;" id="customAlertMessage">Alert message here</div>
+      <button class="modal-btn" onclick="closeCustomAlert()">OK</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="customConfirmModal">
+    <div class="modal-content" style="width: 280px; text-align: center;">
+      <div class="receipt-header" style="color: #f59e0b;">Confirmation Required</div>
+      <div style="font-size: 11px; color: #f8fafc; padding: 6px 0;" id="customConfirmMessage">Are you sure?</div>
+      <div style="display: flex; gap: 6px; margin-top: 4px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closeCustomConfirm(false)">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" id="confirmYesBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="customerModal">
+    <div class="modal-content" style="width: 280px;">
+      <div class="receipt-header">Change Customer Name</div>
+      <label style="font-size: 9px; color: #94a3b8;">Customer Name / Table #:</label>
+      <input type="text" id="inputCustomerName" class="custom-input" placeholder="e.g. John Doe or Table 4">
+      <div style="display: flex; gap: 6px; margin-top: 4px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closeCustomerModal()">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" onclick="saveCustomerName()">Save Name</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="noteModal">
+    <div class="modal-content" style="width: 280px;">
+      <div class="receipt-header">Add Order Note</div>
+      <label style="font-size: 9px; color: #94a3b8;">Kitchen Instructions / Note:</label>
+      <input type="text" id="inputOrderNote" class="custom-input" placeholder="e.g. Less spicy, extra rice">
+      <div style="display: flex; gap: 6px; margin-top: 4px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closeNoteModal()">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" onclick="saveOrderNote()">Save Note</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="zReportModal">
+    <div class="modal-content" style="width: 340px;">
+      <div class="receipt-header">Shift Z-Report / Cash Drawer</div>
+      <div style="font-size: 9px; color: #94a3b8; text-align: center; margin-bottom: 4px;">Daily Cash Drawer Summary & Sales Breakdown:</div>
+      <div style="background: #0f172a; padding: 8px; border-radius: 6px; border: 1px solid #334155; display: flex; flex-direction: column; gap: 4px; font-size: 10px;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94a3b8;">Starting Cash (Float):</span>
+          <span style="color: #fff; font-weight: bold;" id="zStartingCashDisplay">₱1,000.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94a3b8;">Total Cash Sales:</span>
+          <span style="color: #22c55e; font-weight: bold;" id="zCashSales">₱0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94a3b8;">Total GCash / QR Sales:</span>
+          <span style="color: #38bdf8; font-weight: bold;" id="zGcashSales">₱0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #94a3b8;">Voided / Refunded:</span>
+          <span style="color: #ef4444; font-weight: bold;" id="zVoidedSales">₱0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-top: 1px dashed #334155; padding-top: 4px; margin-top: 2px;">
+          <span style="color: #f8fafc; font-weight: bold;">Expected Cash in Drawer:</span>
+          <span style="color: #22c55e; font-weight: 800; font-size: 12px;" id="zExpectedCash">₱1,000.00</span>
+        </div>
+      </div>
+      <button class="modal-btn" style="background: #334155; color: #fff; margin-top: 6px;" onclick="closeZReportModal()">Close Report</button>
+    </div>
+  </div>
+
+  <div id="kdsTicket" style="display:none;"></div>
+  <div class="modal-overlay" id="kdsModal">
+    <div class="modal-content" style="width: 500px; max-height: 90vh;">
+      <div class="receipt-header">Kitchen Display System (KDS)</div>
+      <div style="font-size: 9px; color: #94a3b8; text-align: center; margin-bottom: 4px;">Live incoming orders for kitchen preparation:</div>
+      <div class="kds-grid" id="kdsContainer" style="max-height: 320px; overflow-y: auto;">
+        <div class="cart-empty">No active kitchen orders</div>
+      </div>
+      <button class="modal-btn" style="background: #334155; color: #fff; margin-top: 8px;" onclick="closeKdsModal()">Close Kitchen View</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="paymentModal">
+    <div class="modal-content" style="width: 320px;">
+      <div class="receipt-header">Select Payment Method</div>
+      <div class="pay-method-grid">
+        <div class="pay-method-tab active" id="tabCash" onclick="switchPaymentMethod('Cash')">💵 Cash</div>
+        <div class="pay-method-tab" id="tabGcash" onclick="switchPaymentMethod('GCash')">📱 GCash / QR</div>
+      </div>
+      <div id="cashPaymentSection">
+        <div style="font-size: 10px; color: #94a3b8; margin-bottom: 2px;">Total Due:</div>
+        <div style="font-size: 16px; font-weight: 800; color: #22c55e; margin-bottom: 6px;" id="payModalTotal">₱0.00</div>
+        <label style="font-size: 9px; color: #94a3b8;">Cash Tendered:</label>
+        <input type="number" id="cashTenderedInput" class="custom-input" placeholder="0.00" oninput="calculateChange()" style="font-size: 14px; font-weight: bold; color: #38bdf8;">
+        
+        <!-- Quick Cash Presets Grid -->
+        <div class="quick-cash-grid">
+          <button type="button" class="quick-cash-btn exact-btn" onclick="setExactCash()">Exact</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(20)">₱20</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(50)">₱50</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(100)">₱100</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(200)">₱200</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(500)">₱500</button>
+          <button type="button" class="quick-cash-btn" onclick="setPresetCash(1000)">₱1000</button>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; margin-top: 4px; background: #0f172a; padding: 6px; border-radius: 4px; border: 1px solid #334155;">
+          <span style="color: #94a3b8;">Change Due:</span>
+          <span style="color: #22c55e; font-weight: 800;" id="changeDisplay">₱0.00</span>
+        </div>
+      </div>
+      <div id="gcashPaymentSection" style="display: none; text-align: center; padding: 4px 0;">
+        <div style="font-size: 10px; color: #38bdf8; margin-bottom: 4px; font-weight: bold;">Customer pays to the store's GCash QR</div>
+        <div style="background: #fff; width: 120px; height: 120px; margin: 0 auto; display: none; align-items: center; justify-content: center; border-radius: 6px; padding: 4px;">
+          <img id="gcashQrImage" src="" alt="GCash QR Code" style="width: 100%; height: 100%; object-fit: contain;">
+        </div>
+        <div style="font-size: 9px; color: #94a3b8; margin-top: 6px;">Store: <strong style="color: #fff;" id="qrStoreLabel">Totskie Tech</strong></div>
+        <div style="font-size: 9px; color: #94a3b8;">GCash No: <strong style="color: #22c55e;" id="qrContactLabel">0912-345-6789</strong></div>
+        <div style="font-size: 9px; color: #94a3b8; margin-top: 8px; text-align: left;">GCash Reference No. (from customer's phone):</div>
+        <input type="text" id="gcashRefInput" class="custom-input" autocomplete="off" placeholder="e.g. 1234 567 890123" style="min-height: 44px; margin-top: 2px; text-align: center; font-weight: bold; color: #22c55e;">
+      </div>
+      <div style="display: flex; gap: 6px; margin-top: 8px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closePaymentModal()">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" onclick="confirmAndProcessPayment()">Confirm Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-content" style="width: 320px;">
+      <div class="receipt-header">Store Settings & Cash Drawer</div>
+      <label style="font-size: 9px; color: #94a3b8;">Store Name:</label>
+      <input type="text" id="settingStoreName" class="custom-input" placeholder="Totskie Tech Solution">
+      <label style="font-size: 9px; color: #94a3b8;">Store Address / Branch:</label>
+      <input type="text" id="settingStoreAddress" class="custom-input" placeholder="Palompon, Leyte">
+      <label style="font-size: 9px; color: #94a3b8;">Contact Number (GCash No.):</label>
+      <input type="text" id="settingStoreContact" class="custom-input" placeholder="09123456789">
+      <label style="font-size: 9px; color: #94a3b8; margin-top: 2px;">Starting Cash / Float (₱):</label>
+      <input type="number" id="settingStartingCash" class="custom-input" placeholder="1000.00" style="color: #22c55e; font-weight: bold;">
+      <label style="font-size: 9px; color: #94a3b8; margin-top: 2px;">Custom Receipt Footer Message:</label>
+      <input type="text" id="settingFooterMessage" class="custom-input" placeholder="Thank you, come again!">
+      <label style="font-size: 9px; color: #94a3b8; margin-top: 6px;">GCash / QR Ph image (shown on payment screen):</label>
+      <input type="file" id="settingGcashQrFile" accept="image/*" onchange="handleGcashQrFile(this)" class="custom-input" style="min-height: 44px; font-size: 10px;">
+      <div style="text-align: center; margin-top: 4px;">
+        <img id="settingGcashQrPreview" src="" alt="QR preview" style="display: none; width: 100px; height: 100px; object-fit: contain; background: #fff; border-radius: 6px; padding: 4px; margin: 0 auto;">
+      </div>
+      <button type="button" id="settingGcashQrRemove" class="modal-btn" onclick="removeGcashQr()" style="display: none; background: #7f1d1d; color: #fca5a5; min-height: 44px; margin-top: 4px; font-size: 10px;">Remove QR image</button>
+      <div style="background: #0f172a; padding: 8px; border-radius: 4px; border: 1px solid #334155; margin-top: 4px;">
+        <div style="font-size: 10px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;">Tax & Service Charge Settings</div>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #f8fafc; cursor: pointer; margin-bottom: 4px;">
+          <input type="checkbox" id="settingEnableTax" style="accent-color: #22c55e;"> Enable VAT (12%)
+        </label>
+        <label style="display: flex; align-items: center; gap: 6px; font-size: 10px; color: #f8fafc; cursor: pointer;">
+          <input type="checkbox" id="settingEnableService" style="accent-color: #22c55e;"> Enable Service Charge (5%)
+        </label>
+      </div>
+      <button class="modal-btn" style="background: #334155; color: #38bdf8; margin-top: 4px; font-size: 9px;" onclick="exportSalesCsv()">📊 Export Sales Report (CSV)</button>
+      <button class="modal-btn" style="background: #334155; color: #38bdf8; margin-top: 2px; font-size: 9px;" onclick="exportInventoryCsv()">📦 Export Inventory (CSV)</button>
+      <div style="display: flex; gap: 6px; margin-top: 8px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closeSettingsModal()">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" onclick="saveStoreSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="salesHistoryModal">
+    <div class="modal-content" style="width: 400px;">
+      <div class="receipt-header">Receipts & Sales History</div>
+      <div style="background: #0f172a; border: 1px solid #334155; padding: 8px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+        <div>
+          <div style="font-size: 9px; color: #94a3b8;">Total Revenue Today</div>
+          <div style="font-size: 14px; font-weight: 800; color: #22c55e;" id="totalRevenueDisplay">₱0.00</div>
+        </div>
+        <button class="modal-btn" style="background: #7f1d1d; color: #fca5a5; padding: 4px 8px; font-size: 9px;" onclick="clearSalesHistory()">Reset History</button>
+      </div>
+      <div style="max-height: 200px; overflow-y: auto; margin-top: 6px;">
+        <table class="manager-table">
+          <thead>
+            <tr>
+              <th>Time / Cust</th>
+              <th>Total</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="salesHistoryTableBody"></tbody>
+        </table>
+      </div>
+      <button class="modal-btn" style="background: #334155; color: #fff; margin-top: 6px;" onclick="closeSalesHistoryModal()">Close</button>
+    </div>
+  </div>
+
+  <!-- ITEM & CATEGORY MANAGER MODAL -->
+  <div class="modal-overlay" id="itemManagerModal">
+    <div class="modal-content" style="width: 380px;">
+      <div class="receipt-header">Items & Inventory Management</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+        <span style="font-size: 10px; color: #94a3b8;">Manage menu & stock levels:</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="modal-btn" style="padding: 4px 6px; font-size: 9px; background: #38bdf8; color: #0f172a;" onclick="toggleCategorySection()">📁 Categories</button>
+          <button class="modal-btn" style="padding: 4px 6px; font-size: 9px;" onclick="openAddProductForm()">+ Add Item</button>
+        </div>
+      </div>
+
+      <!-- CATEGORY MANAGER SECTION -->
+      <div id="categoryManagerContainer" style="display: none; background: #0f172a; border: 1px solid #334155; padding: 8px; border-radius: 6px; margin-top: 6px;">
+        <div style="font-size: 10px; font-weight: bold; color: #38bdf8; margin-bottom: 4px;">Manage Categories</div>
+        <div style="display: flex; gap: 4px; margin-bottom: 6px;">
+          <input type="text" id="newCategoryInput" class="custom-input" placeholder="Category Name (e.g. Hardware)" style="margin-bottom: 0;">
+          <button class="modal-btn" style="padding: 0 10px; font-size: 9px; white-space: nowrap;" onclick="addNewCategory()">Add</button>
+        </div>
+        <div id="categoryListContainer" style="max-height: 100px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+      </div>
+      
+      <div id="productFormContainer" style="display: none; background: #0f172a; border: 1px solid #334155; padding: 8px; border-radius: 6px; margin-top: 6px;">
+        <div style="font-size: 10px; font-weight: bold; color: #22c55e; margin-bottom: 4px;" id="formTitle">Add New Product</div>
+        <input type="hidden" id="editProductId">
+        <label style="font-size: 9px; color: #94a3b8;">Item Name:</label>
+        <input type="text" id="inputItemBarcode" class="custom-input" placeholder="Barcode / SKU (optional)" style="margin-bottom: 6px;">
+          <input type="text" id="inputItemName" class="custom-input" placeholder="e.g. Grilled Chicken">
+        <label style="font-size: 9px; color: #94a3b8;">Price (₱):</label>
+        <input type="number" id="inputItemPrice" class="custom-input" placeholder="150">
+        <label style="font-size: 9px; color: #94a3b8;">Stock Quantity:</label>
+        <input type="number" id="inputItemStock" class="custom-input" placeholder="25">
+        <label style="font-size: 9px; color: #94a3b8;">Category:</label>
+        <select id="inputItemCategory" class="custom-input"></select>
+        <div style="display: flex; gap: 6px; margin-top: 4px;">
+          <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="cancelProductForm()">Cancel</button>
+          <button class="modal-btn" style="flex: 1;" onclick="saveProductData()">Save Item</button>
+        </div>
+      </div>
+
+      <div style="max-height: 180px; overflow-y: auto; margin-top: 6px;">
+        <table class="manager-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Cat</th>
+              <th>Price</th>
+              <th>Stock</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="managerTableBody"></tbody>
+        </table>
+      </div>
+
+      <button class="modal-btn" style="background: #334155; color: #fff; margin-top: 6px;" onclick="closeItemManagerModal()">Close Manager</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="heldModal">
+    <div class="modal-content">
+      <div class="receipt-header">Saved Tickets / Held Orders</div>
+      <div class="receipt-body" id="heldOrdersList">
+        <div class="cart-empty">No held orders found</div>
+      </div>
+      <button class="modal-btn" style="background: #334155; color: #fff;" onclick="closeHeldOrdersModal()">Close</button>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="customModal">
+    <div class="modal-content">
+      <div class="receipt-header">Add Custom Item</div>
+      <input type="text" id="customName" class="custom-input" placeholder="Item Name (e.g. Service Fee)">
+      <div class="numpad-display" id="numpadDisplay">₱0.00</div>
+      <div class="numpad-grid">
+        <button class="numpad-btn" onclick="pressNumpad('1')">1</button>
+        <button class="numpad-btn" onclick="pressNumpad('2')">2</button>
+        <button class="numpad-btn" onclick="pressNumpad('3')">3</button>
+        <button class="numpad-btn" onclick="pressNumpad('4')">4</button>
+        <button class="numpad-btn" onclick="pressNumpad('5')">5</button>
+        <button class="numpad-btn" onclick="pressNumpad('6')">6</button>
+        <button class="numpad-btn" onclick="pressNumpad('7')">7</button>
+        <button class="numpad-btn" onclick="pressNumpad('8')">8</button>
+        <button class="numpad-btn" onclick="pressNumpad('9')">9</button>
+        <button class="numpad-btn action" onclick="clearNumpad()">C</button>
+        <button class="numpad-btn" onclick="pressNumpad('0')">0</button>
+        <button class="numpad-btn action" onclick="backspaceNumpad()">⌫</button>
+      </div>
+      <div style="display: flex; gap: 6px; margin-top: 6px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1;" onclick="closeCustomModal()">Cancel</button>
+        <button class="modal-btn" style="flex: 1;" onclick="addCustomItemToCart()">Add to Cart</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="receiptModal">
+    <div class="modal-content" style="background: #ffffff; color: #000000; border-radius: 6px; padding: 16px;">
+      <div class="receipt-header" id="receiptStoreHeader" style="border-bottom: 1px dashed #000; color: #000; font-size: 13px;">Totskie POS System</div>
+      <div style="text-align: center; font-size: 8px; color: #555; margin-bottom: 6px;" id="receiptStoreSub">Palompon, Leyte</div>
+      <div class="receipt-body" id="receiptBody" style="color: #000;"></div>
+      <div style="border-top: 1px dashed #000; margin-top: 6px; padding-top: 4px; display: flex; justify-content: space-between; font-size: 11px; font-weight: bold;">
+        <span>Total Paid:</span>
+        <span id="receiptTotal">₱0.00</span>
+      </div>
+      <div style="font-size: 9px; color: #555; text-align: center; margin-top: 2px;" id="receiptPaymentDetails">Payment: Cash</div>
+      <div class="receipt-barcode" id="receiptBarcode">*9823-4819-2810*</div>
+      <div style="text-align: center; font-size: 8px; color: #555; margin-top: 4px; font-style: italic;" id="receiptFooterMessage">Thank you, come again!</div>
+      <div style="display: flex; gap: 4px; margin-top: 10px;">
+        <button class="modal-btn" style="background: #334155; color: #fff; flex: 1; font-size: 9px;" onclick="printReceipt()">🖨️ Print</button>
+        <button class="modal-btn" style="background: #38bdf8; color: #0f172a; flex: 1; font-size: 9px;" onclick="copyReceiptToClipboard()">📋 Copy</button>
+        <button class="modal-btn" style="background: #22c55e; color: #0f172a; flex: 1; font-size: 9px;" onclick="closeModal()">New</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  var keys = ['totskie_categories','totskie_products','totskie_sales','totskie_store','totskie_kds'];
+  try {
+    var x = new XMLHttpRequest(); x.open('GET', '/api/state', false); x.send();
+    if (x.status === 200) {
+      var s = JSON.parse(x.responseText);
+      keys.forEach(function (k) {
+        if ((k === 'totskie_sales' || k === 'totskie_products') && localStorage.getItem('totskie_unsynced_' + k) === '1' && localStorage.getItem(k) !== null) {
+          var u = new XMLHttpRequest(); u.open('POST', '/api/state/' + k, false);
+          u.setRequestHeader('Content-Type', 'application/json');
+          u.send(JSON.stringify({ value: localStorage.getItem(k) }));
+          if (u.status === 200) { localStorage.removeItem('totskie_unsynced_' + k); }
+        }
+        else if (s[k] !== undefined && s[k] !== null) { localStorage.setItem(k, s[k]); }
+        else {
+          var l = localStorage.getItem(k);
+          if (l !== null) {
+            var p = new XMLHttpRequest(); p.open('POST', '/api/state/' + k, false);
+            p.setRequestHeader('Content-Type', 'application/json');
+            p.send(JSON.stringify({ value: l }));
+          }
+        }
+      });
+    }
+  } catch (e) { console.error('State sync failed', e); }
+})();
+</script>
+<script>
+(function () {
+  window.currentRole = null;
+  window.currentUserName = '';
+  function api(method, url, body) {
+    var x = new XMLHttpRequest();
+    try {
+      x.open(method, url, false);
+      if (body) x.setRequestHeader('Content-Type', 'application/json');
+      x.send(body ? JSON.stringify(body) : null);
+    } catch (e) { return { status: 0, data: {} }; }
+    var j = {};
+    try { j = JSON.parse(x.responseText); } catch (e2) {}
+    return { status: x.status, data: j };
+  }
+  function showLogin(setup, offline, signupOpen) {
+    var ov = document.getElementById('loginOverlay');
+    var title = document.getElementById('loginTitle');
+    var dots = document.getElementById('loginDots');
+    var msg = document.getElementById('loginMsg');
+    var pad = document.getElementById('loginPad');
+    ov.style.display = 'flex';
+    var pin = '', first = '', mode = setup ? 'setup1' : 'login';
+    var code = document.createElement('input');
+    code.placeholder = 'Tester code (if you have one)'; code.maxLength = 6;
+    code.value = localStorage.getItem('tcode') || '';
+    code.style.cssText = 'width:80%;max-width:260px;padding:10px;margin:6px auto;font-size:18px;text-align:center;border-radius:8px;border:1px solid #334155;background:#1e293b;color:#f8fafc';
+    code.oninput = function () { code.value = code.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+    title.parentNode.insertBefore(code, title);
+    var sw = document.createElement('button');
+    sw.type = 'button';
+    sw.style.cssText = 'margin:10px auto;background:none;border:none;color:#38bdf8;font-size:15px;cursor:pointer;display:' + ((signupOpen && !setup) ? 'block' : 'none');
+    sw.onclick = function () { pin = ''; first = ''; msg.textContent = ''; mode = (mode === 'login') ? 'signup1' : 'login'; paint(); };
+    pad.parentNode.appendChild(sw);
+    function paint() {
+      title.textContent = mode === 'login' ? 'Enter PIN' : (mode === 'signup1' ? 'Sign up: choose your admin PIN (4-6 digits)' : (mode === 'signup2' ? 'Confirm your PIN' : (mode === 'setup1' ? 'First setup: choose an admin PIN (4-6 digits)' : 'Confirm your PIN')));
+      code.style.display = (mode === 'login') ? 'block' : 'none';
+      sw.textContent = (mode === 'login') ? 'Sign up (new tester)' : 'Back to login';
+      dots.textContent = pin ? '●'.repeat(pin.length) : '';
+    }
+    function submit() {
+      if (offline) { location.reload(); return; }
+      if (!/^[0-9]{4,6}$/.test(pin)) { msg.textContent = 'PIN must be 4-6 digits.'; return; }
+      if (mode === 'signup1') { first = pin; pin = ''; mode = 'signup2'; paint(); return; }
+      if (mode === 'signup2') {
+        if (pin !== first) { msg.textContent = 'PINs do not match. Start again.'; pin = ''; first = ''; mode = 'signup1'; paint(); return; }
+        var sg = api('POST', '/api/auth/signup', { pin: pin });
+        if (sg.status === 200) { localStorage.setItem('tcode', sg.data.code); alert('Your tester code: ' + sg.data.code + '\nWrite it down, you need it to log in.'); location.reload(); return; }
+        msg.textContent = sg.data.error || 'Sign-up failed.'; pin = ''; first = ''; mode = 'signup1'; paint(); return;
+      }
+      if (mode === 'setup1') { first = pin; pin = ''; mode = 'setup2'; paint(); return; }
+      if (mode === 'setup2') {
+        if (pin !== first) { msg.textContent = 'PINs do not match. Start again.'; pin = ''; first = ''; mode = 'setup1'; paint(); return; }
+        var r = api('POST', '/api/auth/setup', { pin: pin });
+        if (r.status === 200) { location.reload(); return; }
+        msg.textContent = r.data.error || 'Setup failed.'; pin = ''; mode = 'setup1'; paint(); return;
+      }
+      var l = api('POST', '/api/auth/login', { pin: pin, code: code.value });
+      if (l.status === 200) { localStorage.setItem('tcode', code.value); location.reload(); return; }
+      msg.textContent = l.data.error || 'Wrong PIN.'; pin = ''; paint();
+    }
+    function press(k) {
+      msg.textContent = '';
+      if (k === 'del') { pin = pin.slice(0, -1); }
+      else if (k === 'ok') { submit(); return; }
+      else if (pin.length < 6) { pin += k; }
+      paint();
+    }
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = k === 'del' ? '⌫' : (k === 'ok' ? 'OK' : k);
+      b.style.cssText = 'min-height:56px;font-size:22px;font-weight:bold;border-radius:8px;cursor:pointer;border:1px solid #334155;background:' + (k === 'ok' ? '#22c55e;color:#052e16' : '#1e293b;color:#f8fafc');
+      b.onclick = function () { press(k); };
+      pad.appendChild(b);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (ov.style.display !== 'flex' || e.target === code) return;
+      if (e.key.length === 1 && e.key >= '0' && e.key <= '9') press(e.key);
+      else if (e.key === 'Backspace') press('del');
+      else if (e.key === 'Enter') press('ok');
+    });
+    if (offline) msg.textContent = 'Cannot reach the server. Tap OK to retry.';
+    paint();
+  }
+  var res = api('GET', '/api/auth/status');
+  if (res.status === 200 && res.data.user) {
+    window.currentRole = res.data.user.role;
+    window.currentUserName = res.data.user.name;
+  } else {
+    showLogin(res.status === 200 && res.data.setup_needed, res.status !== 200, res.status === 200 && res.data.signup_open);
+  }
+})();
+</script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+
+<div id="hybridDiscountModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; box-sizing: border-box; padding: 15px;">
+    <div style="background: #1e293b; color: #f8fafc; padding: 20px; border-radius: 12px; width: 100%; max-width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); font-family: inherit; box-sizing: border-box;">
+        <h3 style="margin-top: 0; margin-bottom: 15px; font-size: 18px; text-align: center; color: #38bdf8;">Apply Discount</h3>
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 15px;">
+            <button onclick="selectDiscountPreset(5)" style="background: #334155; color: #fff; border: 1px solid #475569; padding: 8px; border-radius: 6px; cursor: pointer;">5%</button>
+            <button onclick="selectDiscountPreset(10)" style="background: #334155; color: #fff; border: 1px solid #475569; padding: 8px; border-radius: 6px; cursor: pointer;">10%</button>
+            <button onclick="selectDiscountPreset(15)" style="background: #334155; color: #fff; border: 1px solid #475569; padding: 8px; border-radius: 6px; cursor: pointer;">15%</button>
+            <button onclick="selectDiscountPreset(20)" style="background: #334155; color: #fff; border: 1px solid #475569; padding: 8px; border-radius: 6px; cursor: pointer;">20%</button>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 12px; color: #94a3b8; display: block; margin-bottom: 5px;">Custom Value (% or ₱)</label>
+            <input type="number" id="manualDiscountInput" placeholder="Enter value..." style="width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #475569; color: #fff; border-radius: 6px; box-sizing: border-box; font-size: 14px;">
+        </div>
+
+        <div style="display: flex; gap: 8px;">
+            <button onclick="closeHybridDiscountModal()" style="flex: 1; background: #475569; color: #fff; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600;">Cancel</button>
+            <button onclick="applyManualOrPresetDiscount()" style="flex: 1; background: #0284c7; color: #fff; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600;">Apply</button>
+        </div>
+    </div>
+</div>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+<!-- Camera Scanner Modal -->
+
+    
+  </div>
+</div>
+
+
+<!-- Item Modifiers Modal -->
+<div id="modifierModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:white; padding:20px; border-radius:12px; max-width:400px; width:90%; text-align:left;">
+    <h3 id="modProductName" style="margin-top:0; text-align:center; color:#1f2937;">Customize Item</h3>
+    <div id="modifierOptionsList" style="max-height: 250px; overflow-y: auto; margin-bottom: 15px; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 10px 0;"></div>
+    <div style="display:flex; gap:10px;">
+      <button onclick="confirmModifiers()" style="flex:1; padding:12px; background:#16a34a; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Confirm & Add</button>
+      <button onclick="closeModifierModal()" style="flex:1; padding:12px; background:#6b7280; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Kitchen Order Ticket (KOT) Modal -->
+<div id="kotModal" class="modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:white; padding:20px; border-radius:12px; max-width:500px; width:90%; text-align:left; max-height: 80vh; display:flex; flex-direction:column;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid #e5e7eb; padding-bottom:10px;">
+      <h3 style="margin:0; color:#1f2937;">🍳 Active Kitchen Orders (KOT)</h3>
+      <button onclick="closeKotModal()" style="background:none; border:none; font-size:18px; cursor:pointer; font-weight:bold;">✕</button>
+    </div>
+    <div id="kotOrdersList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:12px;">
+      <!-- Dynamic KOT tickets will appear here -->
+    </div>
+    <div style="margin-top:15px; border-top:1px solid #e5e7eb; padding-top:10px; text-align:right;">
+      <button onclick="closeKotModal()" style="padding:10px 20px; background:#6b7280; color:white; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Close</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Barcode Scanner Modal -->
+
+    <!-- Camera Viewport -->
+    
+    
+  </div>
+</div>
+
+<script src="/static/guide.js"></script><script src="/static/guide2.js"></script><script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js')</script>
+</body>
+
+</html>
